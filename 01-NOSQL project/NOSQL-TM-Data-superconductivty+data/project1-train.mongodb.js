@@ -1,19 +1,50 @@
 // Select the database to use.
 use('test');
 
-var collection = db.train;
+var currCollection = db.train;
 
 var properties = [];
-var values_of_properties = [];
+var continousProperties = [];
+var categoricProperties = [];
+
+var valuesOfProperties = [];
+var valuesOfContinousProps = [];
+var valuesOfCategoricProps = [];
+var mapOfAvgValues = new Map();
+var mapOfFrequencies = new Map();
+
+var insertionFlag = true;
+
 var documentsWithEmptyAttr = [];
 
+function roundTheNumber(num) {
+  return +(Math.round(num + "e+5")  + "e-5");
+}
+
+//setting
 function getProperties(){
   console.log("Getting properties!");
-  const firstDocument = collection.findOne();
+  const firstDocument = currCollection.findOne();
   if(firstDocument){
     for(const key in firstDocument){
       if(firstDocument.hasOwnProperty(key) && key != "_id"){
         properties.push(key);
+        var tempValue = currCollection.findOne({[key]: { $exists: true, $ne: "" }}, { _id: 0, [key]: 1 })
+        
+        if (tempValue) {
+          const val = tempValue[key];
+        
+          if (typeof val === 'number') {
+            //print(`The value "${val}" is a number.`);
+            continousProperties.push(key);
+          } else {
+            //print(`The value "${val}" is not a number.`);
+            categoricProperties.push(key);
+          }
+        } else {
+          print("No documents found in the collection.");
+        }
+
       }
     }
     console.log("DONE with getting properties!\n");
@@ -22,46 +53,25 @@ function getProperties(){
   }
 }
 
-function getMoreInfoFromContinualProperties(){
-  console.log("Getting more info for continual properties!");
-  properties.forEach((property) => {
-    var groupStage = {
-      $group: {
-          _id: null,
-          //if condition (prop != "") is met -> value is $prop, else is null
-          avgValue: { $avg: { $cond: [{ $ne: ["$" + property, ""] }, "$" + property, null] } },
-          stdDevValue: { $stdDevPop: { $cond: [{ $ne: ["$" + property, "" ]}, "$" + property, null] } },
-          count: { $sum: { $cond: [{ $ne: ["$" + property, "" ]}, 1, 0] } }
-      }
-    };
-    values_of_properties.push(collection.aggregate([groupStage]).toArray()[0]);
-  });
-  console.log("DONE with getting more info for continual properties!\n");
-}
-
-function printPropertiesStats(){
-  console.log("Printing info for continual properties!");
-  values_of_properties.forEach((result, index) => {
-    console.log(`Property: ${properties[index]}`);
-    console.log("Average: " + result.avgValue);
-    console.log("Standard Deviation: " + result.stdDevValue);
-    console.log("Number of Elements: " + result.count);
-    console.log("-----------");
-  });
-  console.log("DONE with printing info for continual properties!\n");
-}
-
+//task 1
 function findAndFixEmptyProperties(){
   console.log("Finding and fixing empty properties!");
   //console.log(documentsWithEmptyAttr.length);
-  db.train.find().forEach((data) => {
-    properties.forEach(element => {
+  currCollection.find().forEach((data) => {
+    continousProperties.forEach(element => {
       const updateQuery = {};
       if(data[element] === "" || data[element] === null){
         updateQuery[`$set`] = { [element]: "-1"};
-        console.log(data[element])
         documentsWithEmptyAttr.push(data);
-        db.train.updateOne(data, updateQuery);
+        currCollection.updateOne(data, updateQuery);
+      }
+    });
+    categoricProperties.forEach(element => {
+      const updateQuery = {};
+      if(data[element] === "" || data[element] === null){
+        updateQuery[`$set`] = { [element]: "empty"};
+        documentsWithEmptyAttr.push(data);
+        currCollection.updateOne(data, updateQuery);
       }
     });
   });
@@ -69,10 +79,107 @@ function findAndFixEmptyProperties(){
   console.log("DONE with finding and fixing empty properties!\n");
 }
 
+//task 2
+function getMoreInfoFromContinousProps(){
+  console.log("Getting more info for continual properties!");
+  continousProperties.forEach((property) => {
+    var groupStage = {
+      $group: {
+          _id: null,
+          name: { $first: { $literal: property } },
+          //if condition (prop != "") is met -> value is $prop, else is null
+          avgValue: { $avg: { $cond: [{ $ne: ["$" + property, ""] }, "$" + property, null] } },
+          stdDevValue: { $stdDevPop: { $cond: [{ $ne: ["$" + property, "" ]}, "$" + property, null] } },
+          count: { $sum: { $cond: [{ $ne: ["$" + property, "" ]}, 1, 0] } }
+      }
+    };
+    let avgVal = currCollection.aggregate([groupStage]).toArray()[0].avgValue;
+    let roundedAvg = roundTheNumber(avgVal);
+    //console.log(`[${property}] -> ` + avgVal);
+    valuesOfProperties.push(currCollection.aggregate([groupStage]).toArray()[0]);
+    mapOfAvgValues.set(property, avgVal);
+  });
+  /* mapOfAvgValues.forEach((value, key) => {
+    console.log(`${key}: ${value}`);
+  }); */
+
+  if(insertionFlag){
+    const new_collection = "continous_props_info";
+    db.createCollection(new_collection);
+    const tempCollectionAccess = db.continous_props_info;
+    // TODO: Change to only insert when there is nothing there, else it should update 
+    tempCollectionAccess.insertMany(valuesOfProperties);
+  }
+
+  console.log("DONE with getting more info for continual properties!\n");
+}
+
+//task 3
+function getFrequenciesFromCategoricProps(){
+  console.log("Getting more info for categoric properties!\n");
+
+  const new_collection = "categoric_props_frequencies";
+  db.createCollection(new_collection);
+  const tempCollectionAccess = db.categoric_props_frequencies;
+
+  const docsToInsert = [];
+  const processedProperties = new Set();
+
+  categoricProperties.forEach((property) => {
+
+    if (!processedProperties.has(property)) {
+
+      var groupStage = {
+        $group: {
+          _id: "$"+property,
+          count: { $sum: 1 }
+        }
+      };
+      var projectStage = {
+        $project: {
+          _id: 0,
+          name: property,
+          values: { [property]: "$_id", count: "$count" }
+        }
+      };
+      
+      var groupResults = currCollection.aggregate([groupStage, projectStage]);
+      
+      var resultDocument = {
+        name: property,
+        values: {}
+      };
+      
+      groupResults.forEach(function (doc) {
+        resultDocument.values[doc.values[property]] = doc.values.count;
+      });
+      
+      docsToInsert.push(resultDocument);
+      processedProperties.add(property);
+    }
+
+  });
+  if(docsToInsert.length != 0){
+    // TODO: Change to only insert when there is nothing there, else it should update 
+    tempCollectionAccess.insertMany(docsToInsert);
+  }
+  console.log("Done with getting more info for categoric properties!\n");
+}
+
+function printContinousPropertiesStats(){
+  console.log("Printing info for continual properties!");
+  valuesOfProperties.forEach((result, index) => {
+    console.log(`Property: ${properties[index]}`);
+    console.log(`Avg: ${roundTheNumber(result.avgValue)}\t | | Standard Deviation: ${roundTheNumber(result.stdDevValue)}\t | | Number of elements: ${result.count}`);
+    console.log("-----------");
+  });
+  console.log("DONE with printing info for continual properties!\n");
+}
+
 function printPotentialCategoricProperties(){
   console.log("Finding and printing potential categoric properties!");
   properties.forEach((property) => {
-    const distinctValues = collection.distinct(property);
+    const distinctValues = currCollection.distinct(property);
 
     if (distinctValues.length <= 100){
       console.log(`Distinct Values for [${property}] => ` + distinctValues.length);
@@ -82,6 +189,8 @@ function printPotentialCategoricProperties(){
 }
 
 getProperties();
+
+findAndFixEmptyProperties();
 
 //categoric values
 /*
@@ -115,12 +224,10 @@ range_Valence
   4, 5, 6
 ]
 */
-printPotentialCategoricProperties();
+//printPotentialCategoricProperties();
 
-//printjson(values_of_properties);
-getMoreInfoFromContinualProperties();
-//printPropertiesStats();
+getMoreInfoFromContinousProps();
+getFrequenciesFromCategoricProps();
 
-findAndFixEmptyProperties();
-
+//printContinousPropertiesStats();
 
