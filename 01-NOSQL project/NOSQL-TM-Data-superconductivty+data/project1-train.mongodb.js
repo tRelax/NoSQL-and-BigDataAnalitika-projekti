@@ -1,7 +1,7 @@
 // Select the database to use.
 use('test');
 
-var currCollection = db.train;
+var currCollection = db.empty_test;
 
 var properties = [];
 var continousProperties = [];
@@ -10,8 +10,7 @@ var categoricProperties = [];
 var valuesOfProperties = [];
 var valuesOfContinousProps = [];
 var valuesOfCategoricProps = [];
-var mapOfAvgValues = new Map();
-var mapOfFrequencies = new Map();
+var mapOfAvgValues = {};
 
 var insertionFlag = true;
 
@@ -79,9 +78,30 @@ function findAndFixEmptyProperties(){
   console.log("DONE with finding and fixing empty properties!\n");
 }
 
+async function getNumberOfDocs(currCollection){
+  console.log("COUNTING!");
+  var myCount = await currCollection.countDocuments(); 
+  console.log("DONE COUNTING!");
+  return myCount;
+}
+
+function deleteAllDocs(currCollection){
+  console.log("DELETING!");
+  currCollection.deleteMany({});
+}
+
 //task 2
 function getMoreInfoFromContinousProps(){
   console.log("Getting more info for continual properties!");
+
+  const new_collection = "statistika_superconductivity_train";
+
+  if(!db.getCollectionNames().includes(new_collection)){
+    console.log("Collection doesn't exist! Creating new!")
+    db.createCollection(new_collection);
+  }
+  const tempCollectionAccess = db.statistika_superconductivity_train;
+
   continousProperties.forEach((property) => {
     var groupStage = {
       $group: {
@@ -97,30 +117,43 @@ function getMoreInfoFromContinousProps(){
     let roundedAvg = roundTheNumber(avgVal);
     //console.log(`[${property}] -> ` + avgVal);
     valuesOfProperties.push(currCollection.aggregate([groupStage]).toArray()[0]);
-    mapOfAvgValues.set(property, avgVal);
+    mapOfAvgValues[property] = avgVal;
   });
   /* mapOfAvgValues.forEach((value, key) => {
     console.log(`${key}: ${value}`);
   }); */
 
   if(insertionFlag){
-    const new_collection = "continous_props_info";
-    db.createCollection(new_collection);
-    const tempCollectionAccess = db.continous_props_info;
-    // TODO: Change to only insert when there is nothing there, else it should update 
-    tempCollectionAccess.insertMany(valuesOfProperties);
+    if(valuesOfProperties.length > 0){
+      deleteAllDocs(tempCollectionAccess);
+      tempCollectionAccess.insertMany(valuesOfProperties);
+    }
   }
 
   console.log("DONE with getting more info for continual properties!\n");
 }
 
+function printContinousPropertiesStats(){
+  console.log("Printing info for continual properties!");
+  valuesOfProperties.forEach((result, index) => {
+    console.log(`Property: ${properties[index]}`);
+    console.log(`Avg: ${roundTheNumber(result.avgValue)}\t | | Standard Deviation: ${roundTheNumber(result.stdDevValue)}\t | | Number of elements: ${result.count}`);
+    console.log("-----------");
+  });
+  console.log("DONE with printing info for continual properties!\n");
+}
+
 //task 3
 function getFrequenciesFromCategoricProps(){
-  console.log("Getting more info for categoric properties!\n");
+  console.log("Getting more info for categoric properties!");
 
-  const new_collection = "categoric_props_frequencies";
-  db.createCollection(new_collection);
-  const tempCollectionAccess = db.categoric_props_frequencies;
+  const new_collection = "frekvencija_superconductivity_train";  
+
+  if(!db.getCollectionNames().includes(new_collection)){
+    console.log("Collection doesn't exist! Creating new!")
+    db.createCollection(new_collection);
+  }
+  const tempCollectionAccess = db.frekvencija_superconductivity_train;
 
   const docsToInsert = [];
   const processedProperties = new Set();
@@ -159,21 +192,14 @@ function getFrequenciesFromCategoricProps(){
     }
 
   });
-  if(docsToInsert.length != 0){
-    // TODO: Change to only insert when there is nothing there, else it should update 
-    tempCollectionAccess.insertMany(docsToInsert);
+
+  if(insertionFlag){
+    if(docsToInsert.length != 0){
+      deleteAllDocs(tempCollectionAccess);
+      tempCollectionAccess.insertMany(docsToInsert);
+    }
   }
   console.log("Done with getting more info for categoric properties!\n");
-}
-
-function printContinousPropertiesStats(){
-  console.log("Printing info for continual properties!");
-  valuesOfProperties.forEach((result, index) => {
-    console.log(`Property: ${properties[index]}`);
-    console.log(`Avg: ${roundTheNumber(result.avgValue)}\t | | Standard Deviation: ${roundTheNumber(result.stdDevValue)}\t | | Number of elements: ${result.count}`);
-    console.log("-----------");
-  });
-  console.log("DONE with printing info for continual properties!\n");
 }
 
 function printPotentialCategoricProperties(){
@@ -186,6 +212,79 @@ function printPotentialCategoricProperties(){
     }
   })
   console.log("DONE with finding and printing potential categoric properties!\n");
+}
+
+//task 4
+function separateHigherAvgValues(){
+  console.log("Separating average values into 2 documents!");
+
+  const new_collection = "statistika1_superconductivity_train";  
+  const new_collection2 = "statistika2_superconductivity_train";  
+
+  if(!db.getCollectionNames().includes(new_collection)){
+    console.log("Collection doesn't exist! Creating new!")
+    db.createCollection(new_collection);
+  }
+
+  if(!db.getCollectionNames().includes(new_collection2)){
+    console.log("Collection doesn't exist! Creating new!")
+    db.createCollection(new_collection2);
+  }
+  const tempCollectionAccess = db.statistika1_superconductivity_train;
+  const tempCollectionAccess2 = db.statistika2_superconductivity_train;
+
+  deleteAllDocs(tempCollectionAccess);
+  deleteAllDocs(tempCollectionAccess2);
+
+  //manji ili jednak od avg
+  continousProperties.forEach((property) => {
+    var propertyAvg = mapOfAvgValues[property];
+
+    const pipeline = [
+      {
+        $match: {
+          [property]: { $lte: propertyAvg }
+        }
+      },
+      {
+        $group: {
+          _id: `${property}`,
+          manji_ili_jednak: { $push: `$${property}` }
+        }
+      }
+    ];
+
+    var result = currCollection.aggregate(pipeline).toArray();
+    if(result.length != 0){
+      tempCollectionAccess.insertMany(result);
+    }
+  });
+  
+  //veci od avg
+  continousProperties.forEach((property) => {
+    var propertyAvg = mapOfAvgValues[property];
+
+    const pipeline = [
+      {
+        $match: {
+          [property]: { $gt: propertyAvg }
+        }
+      },
+      {
+        $group: {
+          _id: `${property}`,
+          veci: { $push: `$${property}` }
+        }
+      }
+    ];
+
+    var result = currCollection.aggregate(pipeline).toArray();
+    if(result.length != 0){
+      tempCollectionAccess2.insertMany(result);
+    }
+  });
+
+    console.log("Done with separating average values into 2 documents!!\n");
 }
 
 getProperties();
@@ -226,8 +325,7 @@ range_Valence
 */
 //printPotentialCategoricProperties();
 
-getMoreInfoFromContinousProps();
 getFrequenciesFromCategoricProps();
-
-//printContinousPropertiesStats();
+getMoreInfoFromContinousProps();
+//separateHigherAvgValues();
 
