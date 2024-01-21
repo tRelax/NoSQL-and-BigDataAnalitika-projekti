@@ -1,6 +1,6 @@
 use('test');
 
-var currCollection = db.empty_test;
+var currCollection = db.train;
 
 var properties = [];
 var continousProperties = [];
@@ -19,7 +19,7 @@ function getAvgValues(){
         let avgVal = currCollection.aggregate([groupStage]).toArray()[0].avgValue;
         mapOfAvgValues[property] = avgVal;
     })
-    console.log(mapOfAvgValues);
+    //console.log(mapOfAvgValues);
 }
 
 function getProperties(){
@@ -132,3 +132,4 @@ function separateHigherAvgValues(){
 
 getProperties();
 getAvgValues();
+separateHigherAvgValues();

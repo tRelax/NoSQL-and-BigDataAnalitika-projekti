@@ -1,6 +1,6 @@
 use('test');
 
-var currCollection = db.empty_test;
+var currCollection = db.train;
 
 var continousProperties = [];
 var valuesOfProperties = [];
@@ -54,8 +54,8 @@ function getMoreInfoFromContinousProps(){
             _id: null,
             varijabla: { $first: { $literal: property } },
             //if condition (prop != "") is met -> value is $prop, else is null
-            srednja_vrijednost: { $avg: { $cond: [{ $ne: ["$" + property, ""] }, "$" + property, null] } },
-            standardna_devijacija: { $stdDevPop: { $cond: [{ $ne: ["$" + property, "" ]}, "$" + property, null] } },
+            srednja_vrijednost: { $avg: { $cond: [{ $ne: ["$" + property, "-1"] }, "$" + property, null] } },
+            standardna_devijacija: { $stdDevPop: { $cond: [{ $ne: ["$" + property, "-1" ]}, "$" + property, null] } },
             broj_nomissing_elemenata: { $sum: { $cond: [{ $ne: ["$" + property, "-1" ]}, 1, 0] } }
         }
         };

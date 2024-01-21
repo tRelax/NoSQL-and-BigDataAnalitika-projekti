@@ -1,6 +1,6 @@
 use('test');
 
-var currCollection = db.empty_test;
+var currCollection = db.train;
 
 var properties = [];
 var continousProperties = [];

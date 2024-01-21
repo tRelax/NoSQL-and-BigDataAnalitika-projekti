@@ -1,6 +1,6 @@
 use('test');
 
-var currCollection = db.empty_test;
+var currCollection = db.train;
 
 var properties = [];
 var continousProperties = [];
@@ -51,6 +51,7 @@ function getFrequenciesFromCategoricProps(){
       db.createCollection(new_collection);
     }
     const tempCollectionAccess = db.frekvencija_superconductivity_train;
+    deleteAllDocs(tempCollectionAccess);
   
     const docsToInsert = [];
     const processedProperties = new Set();
@@ -92,7 +93,6 @@ function getFrequenciesFromCategoricProps(){
   
     if(insertionFlag){
       if(docsToInsert.length != 0){
-        deleteAllDocs(tempCollectionAccess);
         tempCollectionAccess.insertMany(docsToInsert);
       }
     }
