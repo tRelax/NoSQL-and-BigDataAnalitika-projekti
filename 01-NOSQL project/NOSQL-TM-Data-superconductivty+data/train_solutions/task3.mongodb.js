@@ -53,49 +53,32 @@ function getFrequenciesFromCategoricProps(){
     const tempCollectionAccess = db.frekvencija_superconductivity_train;
     deleteAllDocs(tempCollectionAccess);
   
-    const docsToInsert = [];
-    const processedProperties = new Set();
-  
+    var docs = currCollection.find().toArray();
+
     categoricProperties.forEach((property) => {
-  
-      if (!processedProperties.has(property)) {
-  
-        var groupStage = {
-          $group: {
-            _id: "$"+property,
-            count: { $sum: 1 }
-          }
-        };
-        var projectStage = {
-          $project: {
-            _id: 0,
-            varijabla: property,
-            pojavnost: { [property]: "$_id", count: "$count" }
-          }
-        };
-        
-        var groupResults = currCollection.aggregate([groupStage, projectStage]);
-        
+        //console.log(property);
         var resultDocument = {
-          varijabla: property,
-          pojavnost: {}
-        };
+              varijabla: property,
+              pojavnost: {},
+            }
         
-        groupResults.forEach(function (doc) {
-          resultDocument.pojavnost[doc.pojavnost[property]] = doc.pojavnost.count;
+        tempCollectionAccess.insertOne(resultDocument);
+
+        docs.forEach((doc) =>{
+            var preReplaceValue = doc[property];
+            var prefix = "pojavnost.";
+
+            var value = preReplaceValue.replace(/\./g,"_");
+
+            tempCollectionAccess.updateMany(
+                { varijabla: property },
+                { "$inc": { [prefix + value]:1 } },
+                { upsert: true }
+            );
         });
-        
-        docsToInsert.push(resultDocument);
-        processedProperties.add(property);
-      }
+
   
     });
-  
-    if(insertionFlag){
-      if(docsToInsert.length != 0){
-        tempCollectionAccess.insertMany(docsToInsert);
-      }
-    }
     console.log("Done with getting more info for categoric properties!\n");
 }
 
