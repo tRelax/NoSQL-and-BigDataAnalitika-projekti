@@ -20,7 +20,7 @@ function getProperties(){
         if (tempValue) {
           const val = tempValue[key];
         
-          if (typeof val === 'number') {
+          if (typeof val === 'number' && key != "number_of_elements") {
             continousProperties.push(key);
           } else {
             categoricProperties.push(key);
@@ -65,10 +65,8 @@ function getFrequenciesFromCategoricProps(){
         tempCollectionAccess.insertOne(resultDocument);
 
         docs.forEach((doc) =>{
-            var preReplaceValue = doc[property];
             var prefix = "pojavnost.";
-
-            var value = preReplaceValue.replace(/\./g,"_");
+            var value = doc[property];
 
             tempCollectionAccess.updateMany(
                 { varijabla: property },
@@ -76,7 +74,6 @@ function getFrequenciesFromCategoricProps(){
                 { upsert: true }
             );
         });
-
   
     });
     console.log("Done with getting more info for categoric properties!\n");

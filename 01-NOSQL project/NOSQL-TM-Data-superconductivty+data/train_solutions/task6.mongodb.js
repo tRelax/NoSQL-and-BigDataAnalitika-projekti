@@ -6,10 +6,7 @@ var currColl = db.emb2_superconductivity_train;
 var oldColl = db.train;
 var moreInfo = db.statistika_superconductivity_train;
 
-oldColl.find().forEach(doc => {
-  const emb2Doc = Object.assign({ _id: doc._id }, doc);
-  currColl.insertOne(emb2Doc);
-});
+oldColl.aggregate([{$out: "emb2_superconductivity_train"}]);
 
 if(moreInfo.countDocuments() > 0){
   oldColl.find().forEach(doc => {
@@ -30,3 +27,4 @@ if(moreInfo.countDocuments() > 0){
   });
 }
 
+//

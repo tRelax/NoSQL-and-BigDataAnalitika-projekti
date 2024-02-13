@@ -8,8 +8,6 @@ koristeći $set modifikator
 
 use('test')
 
-//db.embX_superconductivity_train.drop();
-
 var currColl = db.emb2_superconductivity_train;
 var pastColl = db.train;
 
@@ -29,7 +27,7 @@ function getProperties(){
             
             if (tempValue) {
             const val = tempValue[key];
-                if (typeof val === 'number') {
+                if (typeof val === 'number' && key != "number_of_elements") {
                     continousProperties.push(key);
                 } 
             } else {
@@ -62,7 +60,6 @@ function task7(){
         //console.log(tempMap);
         currColl.updateOne({ _id: doc._id}, {$set: {"dev_over_avg":tempMap}});
     })
-    
 }
 
 getProperties();

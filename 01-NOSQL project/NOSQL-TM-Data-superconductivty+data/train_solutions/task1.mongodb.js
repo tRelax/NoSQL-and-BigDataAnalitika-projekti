@@ -18,7 +18,7 @@ function getProperties(){
         if (tempValue) {
           const val = tempValue[key];
         
-          if (typeof val === 'number') {
+          if (typeof val === 'number' && key != "number_of_elements") {
             continousProperties.push(key);
           } else {
             categoricProperties.push(key);

@@ -6,8 +6,6 @@ var continousProperties = [];
 var valuesOfProperties = [];
 var mapOfAvgValues = {};
 
-var insertionFlag = true;
-
 function getProperties(){
     console.log("Getting properties!");
     const firstDocument = currCollection.findOne();
@@ -18,7 +16,7 @@ function getProperties(){
             
             if (tempValue) {
             const val = tempValue[key];
-                if (typeof val === 'number') {
+                if (typeof val === 'number' && key != "number_of_elements") {
                     continousProperties.push(key);
                 } 
             } else {
@@ -68,11 +66,9 @@ function getMoreInfoFromContinousProps(){
         console.log(`${key}: ${value}`);
     }); */
 
-    if(insertionFlag){
-        if(valuesOfProperties.length > 0){
+    if(valuesOfProperties.length > 0){
         deleteAllDocs(tempCollectionAccess);
         tempCollectionAccess.insertMany(valuesOfProperties);
-        }
     }
 
     console.log("DONE with getting more info for continual properties!\n");

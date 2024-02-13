@@ -34,11 +34,9 @@ function getProperties(){
           if (tempValue) {
             const val = tempValue[key];
           
-            if (typeof val === 'number') {
-              //print(`The value "${val}" is a number.`);
+            if (typeof val === 'number' && key != "number_of_elements") {
               continousProperties.push(key);
             } else {
-              //print(`The value "${val}" is not a number.`);
               categoricProperties.push(key);
             }
           } else {
